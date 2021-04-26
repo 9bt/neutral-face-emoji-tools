@@ -1,4 +1,6 @@
 <script>
+  import uuid from 'uuid';
+
   import Upload from './upload.svelte';
   import FileDropzone from './file-dropzone.svelte';
 
@@ -9,45 +11,46 @@
   let uploads = [];
   let uploadsStatusById = {};
 
-  function uploadFiles (files) {
-    files.forEach(file => {
-      const id = uploadEmoji(file, (error) => {
-        if (error) {
-          uploadsStatusById = {
-            ...uploadsStatusById,
-            [id]: {
-              type: 'error',
-              message: error.message || error
-            }
-          };
-        } else {
-          uploadsStatusById = {
-            ...uploadsStatusById,
-            [id]: {
-              type: 'success',
-              message: 'Successfully Uploaded.'
-            }
-          };
-        }
-      });
-      uploadsStatusById = {
-        ...uploadsStatusById,
-        [id]: {
-          type: 'uploading',
-          message: 'Uploading...'
-        }
-      };
-      uploads = [...uploads, {
-        file,
-        id
-      }];
-    });
+  async function sleep (msec) {
+    return new Promise(resolve => setTimeout(resolve, msec));
   }
 
-  function handleFilesAdded (event) {
+  function changeUploadsStatus (fileId, type, message) {
+    uploadsStatusById = {
+      ...uploadsStatusById,
+      [fileId]: { type, message },
+    };
+  }
+
+  function changeUploads (file, fileId) {
+    uploads = [...uploads, {
+      file,
+      id: fileId,
+    }];
+  }
+
+  async function uploadFiles (files) {
+    for (const file of files) {
+      const id = uuid.v4();
+
+      try {
+        changeUploadsStatus(id, 'uploading', 'Uploading...');
+        changeUploads(file, id);
+        await uploadEmoji(file, id);
+
+        changeUploadsStatus(id, 'success', 'Successfully Uploaded.');
+      } catch (err) {
+        changeUploadsStatus(id, 'error', err.message || err);
+      }
+
+      await sleep(5000);
+    }
+  }
+
+  async function handleFilesAdded (event) {
     const files = event.detail;
 
-    uploadFiles(files);
+    await uploadFiles(files);
   }
 </script>
 

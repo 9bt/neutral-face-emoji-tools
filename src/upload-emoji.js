@@ -7,19 +7,16 @@ import getSlackApiData from './get-slack-api-data';
 
 const MAX_CONCURRENT_REQUESTS = 1;
 
-const slackApi = axios.create({
+const client = axios.create({
   baseURL: `${window.location.origin}/api`
 });
 
-ConcurrencyManager(slackApi, MAX_CONCURRENT_REQUESTS);
+ConcurrencyManager(client, MAX_CONCURRENT_REQUESTS);
 
-const NO_OP = function () {};
-
-export default function uploadEmoji (file, callback = NO_OP) {
+export default async function uploadEmoji (file, id) {
   const { apiToken, versionUid } = getSlackApiData();
-  const timestamp = Date.now() / 1000;  
+  const timestamp = Date.now() / 1000;
   const version = versionUid ? versionUid.substring(0, 8) : 'noversion';
-  const id = uuid.v4();
   const name = file.name.split('.')[0];
 
   const formData = new FormData();
@@ -28,23 +25,21 @@ export default function uploadEmoji (file, callback = NO_OP) {
   formData.append('token', apiToken);
   formData.append('image', file);
 
-  slackApi({
+  const response = await client({
     method: 'post',
     url: `/emoji.add`,
     params: {
-      '_x_id': `${version}-${timestamp}`
+      '_x_id': `${version}-${timestamp}`,
     },
     data: formData,
     withCredentials: true,
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
-  }).catch((error) => {
-    callback(error, null);
-  }).then((response) => {
-    const error = _.get(response, 'data.error');
-    callback(error, response);
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
   });
 
-  return id;
+  const err = _.get(response, 'data.error');
+  if (err) {
+    throw err;
+  }
 }
